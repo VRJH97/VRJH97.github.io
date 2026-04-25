@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>From Bench to Knowledge — How Scientific Data Flows</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400;600&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --ink: #1a1a2e;
+  --paper: #f4f0e8;
+  --paper2: #ede9df;
+  --sepia: #8b7355;
+  --rust: #c0392b;
+  --teal: #16a085;
+  --navy: #2c3e6b;
+  --gold: #b8860b;
+  --sage: #5a7a5a;
+  --lavender: #6b5b8a;
+  --amber: #c07820;
+  --crimson: #8b1a1a;
+
+  --step1: #2c3e6b;
+  --step2: #16a085;
+  --step3: #c07820;
+  --step4: #6b5b8a;
+  --step5: #c0392b;
+  --step6: #5a7a5a;
+  --step7: #8b7355;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Libre Baskerville', Georgia, serif;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Paper texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.6;
+}
+
+/* Decorative ruled lines */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 27px,
+    rgba(139,115,85,0.06) 27px,
+    rgba(139,115,85,0.06) 28px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── HEADER ── */
+header {
+  text-align: center;
+  padding: 60px 0 48px;
+  border-bottom: 2px solid var(--sepia);
+  margin-bottom: 52px;
+  position: relative;
+}
+
+header::before {
+  content: '❧';
+  display: block;
+  font-size: 24px;
+  color: var(--sepia);
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+header h1 {
+  font-size: clamp(22px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+
+header h1 em {
+  font-style: italic;
+  color: var(--navy);
+}
+
+header .subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sepia);
+  margin-top: 12px;
+}
+
+header .example-tag {
+  display: inline-block;
+  background: var(--navy);
+  color: #c8d8f0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 5px 16px;
+  border-radius: 2px;
+  margin-top: 14px;
+}
+
+/* ── TIMELINE SPINE ── */
+.timeline {
+  position: relative;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 38px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--step1) 0%,
+    var(--step2) 16%,
+    var(--step3) 32%,
+    var(--step4) 48%,
+    var(--step5) 64%,
+    var(--step6) 80%,
+    var(--step7) 100%
+  );
+  opacity: 0.5;
+}
+
+/* ── STEP ── */
+.step {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 0;
+  position: relative;
+  animation: fadeSlide 0.6s ease both;
+}
+
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step:nth-child(1) { animation-delay: 0.05s; }
+.step:nth-child(2) { animation-delay: 0.15s; }
+.step:nth-child(3) { animation-delay: 0.25s; }
+.step:nth-child(4) { animation-delay: 0.35s; }
+.step:nth-child(5) { animation-delay: 0.45s; }
+.step:nth-child(6) { animation-delay: 0.55s; }
+.step:nth-child(7) { animation-delay: 0.65s; }
+
+/* Step number bubble */
+.step-num {
+  flex-shrink: 0;
+  width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 24px;
+}
+
+.bubble {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+/* Connector line below bubble */
+.step-connector {
+  flex: 1;
+  width: 2px;
+  min-height: 20px;
+  margin-top: 6px;
+  opacity: 0.25;
+}
+
+/* Step body */
+.step-body {
+  flex: 1;
+  padding: 24px 28px 28px;
+  border-radius: 3px;
+  margin-bottom: 16px;
+  border-left: 4px solid;
+  background: var(--paper2);
+  box-shadow: 2px 3px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+.step-body::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 80px; height: 80px;
+  border-radius: 0 0 0 80px;
+  opacity: 0.04;
+}
+
+.step-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.step-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 10px;
+  color: var(--ink);
+}
+
+.step-title em {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.step-narrative {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #3a3a4a;
+  margin-bottom: 18px;
+  font-style: italic;
+}
+
+/* DB pills grid */
+.db-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.db-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+  cursor: default;
+  transition: transform 0.15s;
+}
+.db-pill:hover { transform: translateY(-1px); }
+
+.db-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Data flow arrows */
+.flows {
+  border-top: 1px dashed rgba(139,115,85,0.3);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+.flows-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sepia);
+  margin-bottom: 10px;
+}
+
+.flow-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 7px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #4a4a5a;
+}
+
+.flow-arrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Key insight box */
+.insight {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.insight strong {
+  font-style: normal;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* ── BETWEEN-STEP ARROW ── */
+.between-arrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 0 88px;
+  margin: -4px 0 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--sepia);
+  opacity: 0.7;
+  position: relative;
+  z-index: 2;
+}
+
+.between-arrow .line {
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--sepia) 0px, var(--sepia) 4px, transparent 4px, transparent 8px);
+  opacity: 0.4;
+}
+
+.between-arrow .arr { font-size: 16px; }
+
+/* ── INFRASTRUCTURE SECTION ── */
+.infra-section {
+  margin-top: 52px;
+  padding-top: 36px;
+  border-top: 2px solid var(--sepia);
+}
+
+.infra-section h2 {
+  font-size: 22px;
+  font-style: italic;
+  text-align: center;
+  margin-bottom: 8px;
+  color: var(--navy);
+}
+
+.infra-section .infra-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--sepia);
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.infra-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.infra-card {
+  background: var(--paper2);
+  border: 1px solid rgba(139,115,85,0.25);
+  border-radius: 3px;
+  padding: 20px 18px;
+  box-shadow: 1px 2px 8px rgba(0,0,0,0.05);
+}
+
+.infra-card .ic-icon {
+  font-size: 22px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.infra-card h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.infra-card p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #5a5a6a;
+  font-style: italic;
+}
+
+/* ── LOOP DIAGRAM ── */
+.loop-wrap {
+  margin: 40px 0;
+  text-align: center;
+}
+
+.loop-wrap h3 {
+  font-size: 16px;
+  font-style: italic;
+  color: var(--navy);
+  margin-bottom: 24px;
+}
+
+.loop-diagram {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 800px;
+}
+
+.loop-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.loop-box {
+  padding: 10px 16px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  border: 1px solid;
+  line-height: 1.4;
+  min-width: 90px;
+}
+
+.loop-label {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--sepia);
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+}
+
+.loop-arrow {
+  font-size: 20px;
+  color: var(--sepia);
+  opacity: 0.5;
+  padding: 0 4px;
+  flex-shrink: 0;
+  align-self: center;
+  margin-bottom: 20px;
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center;
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(139,115,85,0.3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--sepia);
+  opacity: 0.7;
+}
+
+footer::before {
+  content: '✦ ✦ ✦';
+  display: block;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+/* Step-specific colours */
+.s1 { --c: var(--step1); }
+.s2 { --c: var(--step2); }
+.s3 { --c: var(--step3); }
+.s4 { --c: var(--step4); }
+.s5 { --c: var(--step5); }
+.s6 { --c: var(--step6); }
+.s7 { --c: var(--step7); }
+
+.step-body { border-left-color: var(--c); }
+.step-body::before { background: var(--c); }
+.step-label { color: var(--c); }
+.bubble { background: var(--c); }
+.step-connector { background: var(--c); }
+
+/* DB pill theming per step */
+.pill-1 { background: rgba(44,62,107,0.06); border-color: rgba(44,62,107,0.25); color: var(--step1); }
+.pill-1 .dot { background: var(--step1); }
+.pill-2 { background: rgba(22,160,133,0.06); border-color: rgba(22,160,133,0.25); color: var(--step2); }
+.pill-2 .dot { background: var(--step2); }
+.pill-3 { background: rgba(192,120,32,0.07); border-color: rgba(192,120,32,0.3); color: var(--step3); }
+.pill-3 .dot { background: var(--step3); }
+.pill-4 { background: rgba(107,91,138,0.07); border-color: rgba(107,91,138,0.28); color: var(--step4); }
+.pill-4 .dot { background: var(--step4); }
+.pill-5 { background: rgba(192,57,43,0.06); border-color: rgba(192,57,43,0.25); color: var(--step5); }
+.pill-5 .dot { background: var(--step5); }
+.pill-6 { background: rgba(90,122,90,0.07); border-color: rgba(90,122,90,0.28); color: var(--step6); }
+.pill-6 .dot { background: var(--step6); }
+.pill-7 { background: rgba(139,115,85,0.07); border-color: rgba(139,115,85,0.28); color: var(--step7); }
+.pill-7 .dot { background: var(--step7); }
+
+/* Insight box colours */
+.insight-1 { background: rgba(44,62,107,0.05); border-left: 3px solid rgba(44,62,107,0.3); }
+.insight-2 { background: rgba(22,160,133,0.05); border-left: 3px solid rgba(22,160,133,0.3); }
+.insight-3 { background: rgba(192,120,32,0.05); border-left: 3px solid rgba(192,120,32,0.3); }
+.insight-4 { background: rgba(107,91,138,0.05); border-left: 3px solid rgba(107,91,138,0.3); }
+.insight-5 { background: rgba(192,57,43,0.05); border-left: 3px solid rgba(192,57,43,0.3); }
+.insight-6 { background: rgba(90,122,90,0.05); border-left: 3px solid rgba(90,122,90,0.3); }
+.insight-7 { background: rgba(139,115,85,0.05); border-left: 3px solid rgba(139,115,85,0.3); }
+
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+<!-- HEADER -->
+<header>
+  <h1>From Bench to Knowledge<br><em>How Scientific Data Moves Through the World</em></h1>
+  <div class="subtitle">A schematic of the global scientific data pipeline</div>
+  <div class="example-tag">Case Study: PTEN Mutation in Breast Cancer</div>
+</header>
+
+<!-- LOOP DIAGRAM -->
+<div class="loop-wrap">
+  <h3>The Fundamental Cycle of Science</h3>
+  <div class="loop-diagram">
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(44,62,107,0.08);border-color:rgba(44,62,107,0.35);color:var(--step1)">Experiment<br>& Discovery</div>
+      <div class="loop-label">Bench</div>
+    </div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(22,160,133,0.08);border-color:rgba(22,160,133,0.35);color:var(--step2)">Raw Data<br>Deposit</div>
+      <div class="loop-label">Archives</div>
+    </div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(192,120,32,0.08);border-color:rgba(192,120,32,0.35);color:var(--step3)">Automated<br>Annotation</div>
+      <div class="loop-label">Pipelines</div>
+    </div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(107,91,138,0.08);border-color:rgba(107,91,138,0.35);color:var(--step4)">Specialist<br>Curation</div>
+      <div class="loop-label">Databases</div>
+    </div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(192,57,43,0.08);border-color:rgba(192,57,43,0.35);color:var(--step5)">Integration<br>& Analysis</div>
+      <div class="loop-label">Science</div>
+    </div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(90,122,90,0.08);border-color:rgba(90,122,90,0.35);color:var(--step6)">Publication<br>& Citation</div>
+      <div class="loop-label">Literature</div>
+    </div>
+    <div class="loop-arrow" style="font-size:16px;transform:rotate(0deg)">↩</div>
+    <div class="loop-node">
+      <div class="loop-box" style="background:rgba(139,115,85,0.08);border-color:rgba(139,115,85,0.35);color:var(--step7)">New<br>Hypotheses</div>
+      <div class="loop-label">Back to bench</div>
+    </div>
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div class="timeline">
+
+  <!-- STEP 1 -->
+  <div class="step s1">
+    <div class="step-num">
+      <div class="bubble">01</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Discovery — The Lab</div>
+      <div class="step-title">Experiment generates raw data</div>
+      <div class="step-narrative">
+        A lab sequences tumour DNA from 500 breast cancer patients. The sequencer outputs billions of short nucleotide reads — raw FASTQ files. At this moment, the data exists only on a hard drive in one building. It has no meaning yet.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-1"><div class="dot"></div>Illumina Sequencer (instrument)</div>
+        <div class="db-pill pill-1"><div class="dot"></div>Lab LIMS system</div>
+        <div class="db-pill pill-1"><div class="dot"></div>PI's computer cluster</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">What happens to the data</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>FASTQ reads are aligned to reference genome (GRCh38) using BWA or STAR</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Variant calling identifies mutations vs. reference sequence</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>A recurring PTEN nonsense mutation is flagged at Chr10:89,692,905</span></div>
+      </div>
+      <div class="insight insight-1">
+        <strong>Key Principle</strong>
+        Data only becomes science when it leaves the lab. Most journals now require data deposition as a condition of publication.
+      </div>
+    </div>
+  </div>
+
+  <div class="between-arrow">
+    <div class="line"></div>
+    <span class="arr">↓</span>
+    <span>MANDATORY DEPOSIT · data submitted before paper is accepted</span>
+    <div class="line"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step s2">
+    <div class="step-num">
+      <div class="bubble">02</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Sequence Archives — Global Infrastructure</div>
+      <div class="step-title">Raw data enters the <em>permanent public record</em></div>
+      <div class="step-narrative">
+        Researchers submit sequences via NCBI's web portal or command-line tools. They fill in metadata: organism, tissue, sequencing platform, experimental conditions. This metadata is what makes data findable. The sequences are immediately mirrored across three continents.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-2"><div class="dot"></div>NCBI SRA (raw reads)</div>
+        <div class="db-pill pill-2"><div class="dot"></div>GenBank (assembled sequences)</div>
+        <div class="db-pill pill-2"><div class="dot"></div>ENA — Europe mirror</div>
+        <div class="db-pill pill-2"><div class="dot"></div>DDBJ — Japan mirror</div>
+        <div class="db-pill pill-2"><div class="dot"></div>GEO (expression data)</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">How the INSDC sync works</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>NCBI, ENA (EMBL-EBI), and DDBJ sync via INSDC protocol every 24 hours</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Data deposited in any one of the three becomes instantly available from all three</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Each sequence gets a permanent accession number (e.g. GSE123456) — its citation ID forever</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Stored in NCBI data centres in Bethesda, MD — petabytes of sequence data</span></div>
+      </div>
+      <div class="insight insight-2">
+        <strong>Infrastructure Reality</strong>
+        GenBank stores exabytes of sequence data and serves millions of BLAST queries daily on dedicated compute clusters. It is publicly funded — entirely by NIH.
+      </div>
+    </div>
+  </div>
+
+  <div class="between-arrow">
+    <div class="line"></div>
+    <span class="arr">↓</span>
+    <span>AUTOMATED PIPELINES · running nightly, no human intervention</span>
+    <div class="line"></div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step s3">
+    <div class="step-num">
+      <div class="bubble">03</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Annotation — Adding Meaning to Sequence</div>
+      <div class="step-title">Databases pull from archives and <em>enrich the data</em></div>
+      <div class="step-narrative">
+        Ensembl's annotation pipeline pulls fresh sequences from GenBank daily. Computational algorithms identify gene models, regulatory elements, and cross-species conserved regions. Separately, the PTEN protein sequence is translated and pulled into UniProt — first as a computational TrEMBL entry, then enriched by expert curators.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-3"><div class="dot"></div>Ensembl (gene annotation)</div>
+        <div class="db-pill pill-3"><div class="dot"></div>UniProt TrEMBL → Swiss-Prot</div>
+        <div class="db-pill pill-3"><div class="dot"></div>RefSeq (NCBI curated sequences)</div>
+        <div class="db-pill pill-3"><div class="dot"></div>InterPro (protein domains)</div>
+        <div class="db-pill pill-3"><div class="dot"></div>Pfam (protein families)</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">Annotation cascade</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>GenBank sequence → Ensembl identifies PTEN gene model on Chr10, exon/intron structure</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Protein sequence → UniProt creates entry P60484 (PTEN_HUMAN), adds phosphatase domain via InterPro</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>ENCODE adds chromatin accessibility data at the PTEN locus across 200+ cell types</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>All annotation cross-referenced: Ensembl gene ID ↔ UniProt accession ↔ HGNC symbol</span></div>
+      </div>
+      <div class="insight insight-3">
+        <strong>The Annotation Problem</strong>
+        Raw sequence is meaningless without annotation. This step transforms "ATCG…" into "This is the tumour suppressor PTEN, which dephosphorylates PIP3."
+      </div>
+    </div>
+  </div>
+
+  <div class="between-arrow">
+    <div class="line"></div>
+    <span class="arr">↓</span>
+    <span>SPECIALIST CURATION · expert humans + cross-database linking</span>
+    <div class="line"></div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step s4">
+    <div class="step-num">
+      <div class="bubble">04</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Variant Classification — Clinical Significance</div>
+      <div class="step-title">The mutation enters <em>clinical databases</em></div>
+      <div class="step-narrative">
+        The specific PTEN variant gets submitted to ClinVar. Curators classify it using evidence from dbSNP (population frequency), OMIM (gene–disease links), and literature. Once classified as Pathogenic, hospital genetic labs worldwide can use this to interpret patient test results.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-4"><div class="dot"></div>ClinVar (variant classification)</div>
+        <div class="db-pill pill-4"><div class="dot"></div>dbSNP (rsID assignment)</div>
+        <div class="db-pill pill-4"><div class="dot"></div>OMIM (gene-disease: #158350)</div>
+        <div class="db-pill pill-4"><div class="dot"></div>GWAS Catalog (population risk)</div>
+        <div class="db-pill pill-4"><div class="dot"></div>ClinGen (clinical validity)</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">Clinical data linkage</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Variant → dbSNP assigns rs# (permanent variant ID) after checking it's not already catalogued</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>OMIM confirms PTEN mutations cause Cowden Syndrome (OMIM #158350) — loss-of-function mechanism</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>ClinVar classifies: Pathogenic (5-star evidence) — this classification propagates to all clinical testing labs</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>GeneCards aggregates all this into a single human-readable gene summary page</span></div>
+      </div>
+      <div class="insight insight-4">
+        <strong>Translation Moment</strong>
+        This is where molecular biology becomes medicine. A ClinVar "Pathogenic" classification directly changes what oncologists tell patients.
+      </div>
+    </div>
+  </div>
+
+  <div class="between-arrow">
+    <div class="line"></div>
+    <span class="arr">↓</span>
+    <span>PATHWAY CONTEXT · understanding mechanism, not just mutation</span>
+    <div class="line"></div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step s5">
+    <div class="step-num">
+      <div class="bubble">05</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Drug Discovery — From Target to Therapy</div>
+      <div class="step-title">Chemistry and structure databases <em>find the intervention</em></div>
+      <div class="step-narrative">
+        PTEN suppresses PI3K/AKT/mTOR. With PTEN broken, this pathway is hyperactivated. Drug discovery teams query chemistry databases to find molecules that inhibit downstream targets. Structure databases reveal the 3D binding pocket. Clinical trial registries show what's already being tested.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-5"><div class="dot"></div>KEGG (PI3K/mTOR pathway map)</div>
+        <div class="db-pill pill-5"><div class="dot"></div>Reactome (reaction-level detail)</div>
+        <div class="db-pill pill-5"><div class="dot"></div>PDB (PTEN crystal structure)</div>
+        <div class="db-pill pill-5"><div class="dot"></div>AlphaFold (isoform structures)</div>
+        <div class="db-pill pill-5"><div class="dot"></div>ChEMBL (AKT inhibitor activity)</div>
+        <div class="db-pill pill-5"><div class="dot"></div>DrugBank (approved drugs)</div>
+        <div class="db-pill pill-5"><div class="dot"></div>ClinicalTrials.gov</div>
+        <div class="db-pill pill-5"><div class="dot"></div>Reaxys (synthesis routes)</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">From target to candidate</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>KEGG/Reactome maps PI3K→AKT→mTOR pathway with every enzyme, substrate, and cross-pathway interaction</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>PDB structure of mTOR kinase domain (PDB: 4JSV) reveals binding pocket geometry for drug design</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>ChEMBL returns 847 compounds with measured AKT inhibition (IC50 values, ADMET profiles)</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>DrugBank confirms rapamycin (sirolimus) is approved — mTOR inhibitor — repurposing candidate</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>ClinicalTrials.gov: 23 active trials of mTOR inhibitors in PTEN-deficient cancers currently recruiting</span></div>
+      </div>
+      <div class="insight insight-5">
+        <strong>The Chemistry Layer</strong>
+        PubChem alone contains 100M+ compounds. ChEMBL has binding data for 2M+ molecules. These databases make drug discovery computational before it becomes experimental.
+      </div>
+    </div>
+  </div>
+
+  <div class="between-arrow">
+    <div class="line"></div>
+    <span class="arr">↓</span>
+    <span>MULTI-OMICS INTEGRATION · the full molecular picture</span>
+    <div class="line"></div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step s6">
+    <div class="step-num">
+      <div class="bubble">06</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Integration — The Full Molecular Picture</div>
+      <div class="step-title">All data layers converge into <em>systems understanding</em></div>
+      <div class="step-narrative">
+        The research team integrates genomics, transcriptomics, proteomics, and metabolomics to understand PTEN loss as a whole-system event — not just a single mutation. This is where databases designed for different data types must speak the same language.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-6"><div class="dot"></div>TCGA / cBioPortal (cancer omics)</div>
+        <div class="db-pill pill-6"><div class="dot"></div>GTEx (normal tissue expression)</div>
+        <div class="db-pill pill-6"><div class="dot"></div>Human Cell Atlas (cell types)</div>
+        <div class="db-pill pill-6"><div class="dot"></div>ENCODE (chromatin landscape)</div>
+        <div class="db-pill pill-6"><div class="dot"></div>STRING (protein interactions)</div>
+        <div class="db-pill pill-6"><div class="dot"></div>HMDB / MetaboLights (metabolites)</div>
+        <div class="db-pill pill-6"><div class="dot"></div>PhosphoSitePlus (PTMs)</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">Data integration workflow</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>cBioPortal: PTEN mutated in 31% of TCGA breast cancers; co-occurs with PIK3CA mutation; worse survival</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>GTEx: normal breast tissue expresses PTEN highly — confirming loss-of-function oncogenic mechanism</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>ENCODE: PTEN promoter shows open chromatin in luminal epithelial cells — explains tissue specificity</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>STRING: PTEN protein interaction network has 47 direct interactors — each a potential co-target</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>HMDB/MetaboLights: PIP3 accumulation (PTEN substrate) seen in tumour metabolomics — validates mechanism in vivo</span></div>
+      </div>
+      <div class="insight insight-6">
+        <strong>Why Multi-Omics Matters</strong>
+        No single database gives the full picture. The mutation (genomics) → elevated pathway activity (proteomics) → metabolite accumulation (metabolomics) chain only emerges from integration.
+      </div>
+    </div>
+  </div>
+
+  <div class="between-arrow">
+    <div class="line"></div>
+    <span class="arr">↓</span>
+    <span>PUBLICATION · closing the loop, enriching all databases</span>
+    <div class="line"></div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="step s7">
+    <div class="step-num">
+      <div class="bubble">07</div>
+      <div class="step-connector"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-label">Publication — Data Feeds Back Into the System</div>
+      <div class="step-title">The paper is published. <em>The cycle restarts.</em></div>
+      <div class="step-narrative">
+        The paper appears in Nature. Within hours, PubMed indexes it. Within days, text-mining algorithms at NCBI and EMBL-EBI scan the full text, automatically updating cross-references in dozens of database records. Human curators are alerted to enrich UniProt, OMIM, and ClinVar entries. Every database touched by this research becomes richer.
+      </div>
+      <div class="db-grid">
+        <div class="db-pill pill-7"><div class="dot"></div>PubMed (indexed within hours)</div>
+        <div class="db-pill pill-7"><div class="dot"></div>Europe PMC (open access full text)</div>
+        <div class="db-pill pill-7"><div class="dot"></div>UniProt (curator flagged)</div>
+        <div class="db-pill pill-7"><div class="dot"></div>ClinVar (evidence updated)</div>
+        <div class="db-pill pill-7"><div class="dot"></div>Reactome (new pathway step added)</div>
+      </div>
+      <div class="flows">
+        <div class="flows-title">How publication enriches databases</div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>PubMed ID (PMID) assigned — every database record that cites this paper links to it permanently</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>Text-mining identifies: gene names (PTEN, PIK3CA), chemicals (rapamycin), diseases (breast cancer) → automatic cross-links</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>UniProt curator reads the paper → adds new functional annotation to PTEN entry P60484</span></div>
+        <div class="flow-row"><span class="flow-arrow">→</span><span>ClinVar submission referenced in paper → classification elevated from Likely Pathogenic to Pathogenic</span></div>
+        <div class="flow-row"><span class="flow-arrow">↩</span><span>Other labs read the paper → design new experiments → generate new data → deposit to GenBank → cycle begins again</span></div>
+      </div>
+      <div class="insight insight-7">
+        <strong>The Compound Effect</strong>
+        Science is cumulative. Each paper enriches 20–50 database records. Those enriched records enable better science by the next team. This is why open access and mandatory data deposition matter — they accelerate the entire cycle.
+      </div>
+    </div>
+  </div>
+
+</div><!-- end timeline -->
+
+<!-- INFRASTRUCTURE SECTION -->
+<div class="infra-section">
+  <h2>The Hidden Infrastructure of Science</h2>
+  <div class="infra-sub">What makes this system work</div>
+
+  <div class="infra-grid">
+    <div class="infra-card">
+      <span class="ic-icon">🏛️</span>
+      <h3>Public Funding</h3>
+      <p>NCBI runs on NIH funding (hundreds of millions annually). EMBL-EBI is funded by 28 European member states. Without public mandate, none of this would be freely accessible.</p>
+    </div>
+    <div class="infra-card">
+      <span class="ic-icon">🔄</span>
+      <h3>INSDC Agreement</h3>
+      <p>GenBank, ENA, and DDBJ formed the International Nucleotide Sequence Database Collaboration in 1987. All three sync every 24 hours — no sequence is ever lost if one centre fails.</p>
+    </div>
+    <div class="infra-card">
+      <span class="ic-icon">🔗</span>
+      <h3>Accession Numbers</h3>
+      <p>Every sequence, variant, structure, and compound gets a permanent accession number. This is the citation system of data — the equivalent of a DOI for raw science.</p>
+    </div>
+    <div class="infra-card">
+      <span class="ic-icon">🤖</span>
+      <h3>Nightly Pipelines</h3>
+      <p>Databases pull from each other via REST APIs on automated schedules. Ensembl pulls GenBank nightly. UniProt pulls Ensembl weekly. No human orchestrates these — it's all scripted infrastructure.</p>
+    </div>
+    <div class="infra-card">
+      <span class="ic-icon">📐</span>
+      <h3>FAIR Principles</h3>
+      <p>Findable, Accessible, Interoperable, Reusable. The philosophical framework that governs how scientific data infrastructure is designed. Enforced by funders and journals.</p>
+    </div>
+    <div class="infra-card">
+      <span class="ic-icon">🧑‍💻</span>
+      <h3>Human Curation</h3>
+      <p>UniProt Swiss-Prot has ~600,000 expertly curated entries built over decades. OMIM curators read every relevant paper published. Automation finds the data; humans give it meaning.</p>
+    </div>
+  </div>
+
+  <!-- Final loop note -->
+  <div style="text-align:center; padding: 28px; background: var(--paper2); border: 1px solid rgba(139,115,85,0.2); border-radius:3px; font-size:14px; line-height:1.8; font-style:italic; color:#4a4a5a; max-width:640px; margin:0 auto;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--sepia); margin-bottom:10px; font-style:normal;">The Core Insight</div>
+    Science is not a collection of isolated facts stored in separate databases. It is a single, continuously enriching network of evidence — where every new experiment feeds every prior record, and every prior record enables every new experiment. The databases are not the destination. They are the connective tissue.
+  </div>
+</div>
+
+<footer>
+  THE ARCHITECTURE OF SCIENTIFIC KNOWLEDGE &nbsp;·&nbsp; FROM BENCH TO GLOBAL RECORD &nbsp;·&nbsp; 2025
+</footer>
+
+</div><!-- end page-wrap -->
+</body>
+</html>

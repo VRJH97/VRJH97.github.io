@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Architecture of Science</title>
+<meta name="description" content="Science made visible. Interactive schematics, knowledge maps, and visual explanations of how science actually works — from databases to drug discovery.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --ink: #0a0c12;
+  --paper: #f5f2eb;
+  --sepia: #8b7a60;
+  --gold: #c9a84c;
+  --border: rgba(139,122,96,0.18);
+  --border-strong: rgba(139,122,96,0.35);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+#cursor {
+  position: fixed;
+  width: 8px; height: 8px;
+  background: var(--gold);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: difference;
+}
+
+#cursor-ring {
+  position: fixed;
+  width: 36px; height: 36px;
+  border: 1px solid rgba(201,168,76,0.4);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  transform: translate(-50%, -50%);
+  transition: width 0.25s, height 0.25s, border-color 0.2s;
+}
+
+.grain {
+  position: fixed; inset: 0; z-index: 1000;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23g)' opacity='0.045'/%3E%3C/svg%3E");
+  opacity: 0.55;
+}
+
+.bg-orb { position: fixed; border-radius: 50%; pointer-events: none; filter: blur(80px); z-index: 0; }
+.orb1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 70%); top: -200px; right: -100px; }
+.orb2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(26,36,68,0.8) 0%, transparent 70%); bottom: -100px; left: -100px; }
+
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+  background: linear-gradient(180deg, rgba(10,12,18,0.98) 0%, rgba(10,12,18,0) 100%);
+}
+
+.nav-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.nav-links { display: flex; gap: 36px; list-style: none; }
+.nav-links a {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(245,242,235,0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--gold); }
+
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 120px 48px 80px;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  left: 48px; top: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent 0%, rgba(201,168,76,0.25) 30%, rgba(201,168,76,0.25) 70%, transparent 100%);
+}
+
+.hero-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.8;
+  margin-bottom: 28px;
+  padding-left: 24px;
+  animation: fadeUp 0.8s 0.1s both;
+}
+
+.hero-title {
+  font-size: clamp(52px, 9vw, 120px);
+  font-weight: 300;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  max-width: 900px;
+  animation: fadeUp 0.8s 0.2s both;
+}
+
+.hero-title em { font-style: italic; font-weight: 300; color: rgba(245,242,235,0.5); }
+.hero-title .gold { color: var(--gold); }
+
+.hero-divider {
+  width: 80px; height: 1px;
+  background: var(--gold); opacity: 0.5;
+  margin: 36px 0;
+  animation: expandWidth 0.8s 0.5s both;
+}
+
+@keyframes expandWidth { from { width: 0; opacity: 0; } to { width: 80px; opacity: 0.5; } }
+
+.hero-desc {
+  font-size: 20px;
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.65;
+  color: rgba(245,242,235,0.55);
+  max-width: 520px;
+  animation: fadeUp 0.8s 0.4s both;
+}
+
+.hero-desc strong { font-style: normal; font-weight: 500; color: rgba(245,242,235,0.8); }
+
+.scroll-hint {
+  position: absolute;
+  bottom: 40px; left: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(245,242,235,0.3);
+  animation: fadeUp 1s 0.8s both;
+}
+
+.scroll-line {
+  width: 40px; height: 1px;
+  background: rgba(245,242,235,0.2);
+  position: relative; overflow: hidden;
+}
+.scroll-line::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: var(--gold);
+  animation: scrollPulse 2s ease-in-out infinite 1.5s;
+}
+@keyframes scrollPulse { 0% { left: -100%; } 100% { left: 100%; } }
+
+.hero-bg-letter {
+  position: absolute;
+  right: -20px; top: 50%;
+  transform: translateY(-50%);
+  font-size: clamp(200px, 30vw, 380px);
+  font-weight: 300;
+  color: rgba(255,255,255,0.015);
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+section { position: relative; z-index: 1; }
+
+.marquee-wrap {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  padding: 14px 0;
+  background: rgba(201,168,76,0.02);
+}
+
+.marquee-track {
+  display: flex;
+  animation: marquee 30s linear infinite;
+  white-space: nowrap;
+}
+
+.marquee-item {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(201,168,76,0.4);
+  padding: 0 32px;
+  flex-shrink: 0;
+}
+
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.manifesto {
+  padding: 60px 48px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.manifesto-item {
+  padding: 20px 36px 20px 0;
+  border-right: 1px solid var(--border);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.manifesto-item:last-child { border-right: none; padding-right: 0; padding-left: 36px; }
+.manifesto-item.visible { opacity: 1; transform: translateY(0); }
+
+.manifesto-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--gold);
+  opacity: 0.6;
+  letter-spacing: 0.15em;
+  margin-bottom: 12px;
+}
+
+.manifesto-text {
+  font-size: 17px;
+  font-style: italic;
+  color: rgba(245,242,235,0.6);
+  line-height: 1.6;
+}
+.manifesto-text strong { font-style: normal; color: rgba(245,242,235,0.9); font-weight: 500; }
+
+.works { padding: 100px 48px; }
+
+.works-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 64px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.works-label {
+  font-size: 13px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(245,242,235,0.35);
+}
+
+.works-count {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  opacity: 0.6;
+}
+
+.works-grid { display: flex; flex-direction: column; }
+
+.work-card {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: start;
+  gap: 32px;
+  padding: 36px 0;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: translateX(-20px);
+}
+.work-card.visible { opacity: 1; transform: translateX(0); }
+
+.work-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(201,168,76,0.03) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.work-card:hover::before { opacity: 1; }
+
+.work-card::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  width: 2px; height: 0%;
+  background: var(--gold);
+  transition: height 0.4s ease;
+}
+.work-card:hover::after { height: 100%; }
+
+.work-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: rgba(245,242,235,0.2);
+  letter-spacing: 0.1em;
+  padding-top: 6px;
+}
+
+.work-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+
+.work-title {
+  font-size: clamp(22px, 3.5vw, 36px);
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--paper);
+  margin-bottom: 12px;
+  transition: color 0.2s;
+}
+.work-card:hover .work-title { color: var(--gold); }
+.work-title em { font-style: italic; font-weight: 300; }
+
+.work-desc {
+  font-size: 15px;
+  font-style: italic;
+  color: rgba(245,242,235,0.4);
+  line-height: 1.65;
+  max-width: 580px;
+  margin-bottom: 16px;
+}
+
+.work-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.work-chip {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1px solid rgba(245,242,235,0.1);
+  border-radius: 2px;
+  color: rgba(245,242,235,0.3);
+}
+
+.work-arrow {
+  font-size: 20px;
+  color: rgba(245,242,235,0.15);
+  padding-top: 6px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+.work-card:hover .work-arrow { color: var(--gold); transform: translate(4px, -4px); }
+
+.about {
+  padding: 80px 48px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+.about-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.7;
+  margin-bottom: 24px;
+}
+
+.about-heading {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 300;
+  line-height: 1.2;
+  color: var(--paper);
+  margin-bottom: 24px;
+}
+.about-heading em { font-style: italic; color: rgba(245,242,235,0.5); }
+
+.about-text {
+  font-size: 16px;
+  font-style: italic;
+  color: rgba(245,242,235,0.5);
+  line-height: 1.8;
+}
+.about-text strong { font-style: normal; color: rgba(245,242,235,0.8); font-weight: 500; }
+
+.about-right { display: flex; flex-direction: column; gap: 24px; }
+
+.about-stat {
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.about-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: var(--gold);
+  opacity: 0.5;
+}
+
+.stat-big {
+  font-size: 38px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--gold);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-desc {
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(245,242,235,0.4);
+  line-height: 1.5;
+}
+
+.coming {
+  padding: 60px 48px;
+  border-top: 1px solid var(--border);
+}
+
+.coming-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(245,242,235,0.3);
+  margin-bottom: 32px;
+}
+
+.coming-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.coming-card {
+  padding: 20px;
+  border: 1px dashed rgba(245,242,235,0.07);
+  border-radius: 2px;
+  position: relative;
+}
+
+.coming-title { font-size: 16px; font-style: italic; color: rgba(245,242,235,0.3); margin-bottom: 6px; }
+.coming-sub { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(245,242,235,0.15); }
+
+.coming-badge {
+  position: absolute;
+  top: 14px; right: 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border: 1px solid rgba(201,168,76,0.2);
+  color: rgba(201,168,76,0.4);
+  border-radius: 2px;
+}
+
+footer { border-top: 1px solid var(--border); position: relative; z-index: 1; }
+
+.footer-inner {
+  padding: 40px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-logo {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245,242,235,0.25);
+}
+
+.footer-copy {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(245,242,235,0.2);
+  letter-spacing: 0.08em;
+}
+
+.footer-links { display: flex; gap: 24px; }
+.footer-links a {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(245,242,235,0.25);
+  text-decoration: none;
+  transition: color 0.2s;
+  text-transform: uppercase;
+}
+.footer-links a:hover { color: var(--gold); }
+
+.scanline {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(201,168,76,0.2), transparent);
+  pointer-events: none;
+  z-index: 600;
+  animation: scan 8s ease-in-out infinite;
+  opacity: 0.5;
+}
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  5% { opacity: 0.5; }
+  95% { opacity: 0.5; }
+  100% { top: 100vh; opacity: 0; }
+}
+
+.page-loader {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.6s ease, visibility 0.6s;
+}
+.page-loader.done { opacity: 0; visibility: hidden; }
+
+.loader-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(201,168,76,0.6);
+}
+
+.loader-bar {
+  width: 200px; height: 1px;
+  background: rgba(255,255,255,0.05);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.loader-fill {
+  height: 100%;
+  background: var(--gold);
+  animation: load 1.2s ease forwards;
+}
+@keyframes load { from { width: 0; } to { width: 100%; } }
+
+@media (max-width: 768px) {
+  nav { padding: 16px 24px; }
+  .nav-links { display: none; }
+  .hero { padding: 100px 24px 60px; }
+  .hero::before { left: 24px; }
+  .hero-eyebrow { padding-left: 16px; }
+  .manifesto { padding: 40px 24px; }
+  .works { padding: 60px 24px; }
+  .work-card { grid-template-columns: 50px 1fr auto; gap: 16px; }
+  .about { padding: 60px 24px; grid-template-columns: 1fr; gap: 40px; }
+  .coming { padding: 40px 24px; }
+  .footer-inner { padding: 32px 24px; flex-direction: column; gap: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-loader" id="loader">
+  <div style="text-align:center">
+    <div class="loader-text">Loading science</div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+  </div>
+</div>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<div class="scanline"></div>
+<div class="grain"></div>
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo">Arch. of Science</a>
+  <ul class="nav-links">
+    <li><a href="#works">Schematics</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#coming">Coming Soon</a></li>
+  </ul>
+</nav>
+
+<div class="hero">
+  <div class="hero-bg-letter">S</div>
+  <div class="hero-eyebrow">Vol. I &nbsp;·&nbsp; Science Communication &nbsp;·&nbsp; 2025</div>
+  <h1 class="hero-title">
+    The<br>
+    <em>Architecture</em><br>
+    <span class="gold">of Science</span>
+  </h1>
+  <div class="hero-divider"></div>
+  <p class="hero-desc">
+    Science made <strong>visible</strong>. Interactive maps, schematics, and visual explanations of how knowledge is built — from databases to drug discovery, from a single mutation to a global cure.
+  </p>
+  <div class="scroll-hint">
+    <div class="scroll-line"></div>
+    Scroll to explore
+  </div>
+</div>
+
+<div class="marquee-wrap">
+  <div class="marquee-track">
+    <span class="marquee-item">Genomics ·</span>
+    <span class="marquee-item">Drug Discovery ·</span>
+    <span class="marquee-item">Database Architecture ·</span>
+    <span class="marquee-item">Proteomics ·</span>
+    <span class="marquee-item">Clinical Trials ·</span>
+    <span class="marquee-item">Botany ·</span>
+    <span class="marquee-item">Metabolomics ·</span>
+    <span class="marquee-item">Molecular Biology ·</span>
+    <span class="marquee-item">Neuroscience ·</span>
+    <span class="marquee-item">Cancer Biology ·</span>
+    <span class="marquee-item">Genomics ·</span>
+    <span class="marquee-item">Drug Discovery ·</span>
+    <span class="marquee-item">Database Architecture ·</span>
+    <span class="marquee-item">Proteomics ·</span>
+    <span class="marquee-item">Clinical Trials ·</span>
+    <span class="marquee-item">Botany ·</span>
+    <span class="marquee-item">Metabolomics ·</span>
+    <span class="marquee-item">Molecular Biology ·</span>
+    <span class="marquee-item">Neuroscience ·</span>
+    <span class="marquee-item">Cancer Biology ·</span>
+  </div>
+</div>
+
+<section class="manifesto">
+  <div class="manifesto-item">
+    <div class="manifesto-num">01</div>
+    <div class="manifesto-text">Science is not a collection of facts. It is a <strong>network of evidence</strong> — and networks can be mapped.</div>
+  </div>
+  <div class="manifesto-item">
+    <div class="manifesto-num">02</div>
+    <div class="manifesto-text">Every database links to another. Every discovery feeds a dozen records. <strong>Nothing in science stands alone.</strong></div>
+  </div>
+  <div class="manifesto-item">
+    <div class="manifesto-num">03</div>
+    <div class="manifesto-text">Understanding how science <em>works</em> is as important as understanding what science <strong>finds.</strong></div>
+  </div>
+</section>
+
+<section class="works" id="works">
+  <div class="works-header">
+    <div class="works-label">Published Schematics</div>
+    <div class="works-count">04 Works</div>
+  </div>
+  <div class="works-grid">
+
+    <a href="science-knowledge-graph.html" class="work-card" target="_blank">
+      <div class="work-num">01</div>
+      <div class="work-body">
+        <div class="work-tag">Interactive Knowledge Graph</div>
+        <div class="work-title">The Architecture <em>of Science</em></div>
+        <div class="work-desc">A force-directed network map of 64 databases across 17 disciplines — showing how scientific knowledge flows, connects, and builds upon itself. Drag, zoom, and click any node to explore its data relationships.</div>
+        <div class="work-meta">
+          <span class="work-chip">64 Databases</span>
+          <span class="work-chip">17 Disciplines</span>
+          <span class="work-chip">Interactive</span>
+          <span class="work-chip">Live Particles</span>
+        </div>
+      </div>
+      <div class="work-arrow">↗</div>
+    </a>
+
+    <a href="scientific-databases-explorer.html" class="work-card" target="_blank">
+      <div class="work-num">02</div>
+      <div class="work-body">
+        <div class="work-tag">Reference Atlas</div>
+        <div class="work-title">Scientific Databases <em>& Knowledge Repositories</em></div>
+        <div class="work-desc">A searchable, filterable reference of every major scientific database — from GenBank to POWO, ChEMBL to the Human Cell Atlas. Search by field, access type, or keyword. Every database tagged, described, and linked.</div>
+        <div class="work-meta">
+          <span class="work-chip">Search & Filter</span>
+          <span class="work-chip">Free vs Paid</span>
+          <span class="work-chip">Grid & List View</span>
+          <span class="work-chip">Direct Links</span>
+        </div>
+      </div>
+      <div class="work-arrow">↗</div>
+    </a>
+
+    <a href="science-data-flow.html" class="work-card" target="_blank">
+      <div class="work-num">03</div>
+      <div class="work-body">
+        <div class="work-tag">Annotated Flowchart</div>
+        <div class="work-title">From Bench <em>to Knowledge</em></div>
+        <div class="work-desc">How a single lab experiment — sequencing a PTEN mutation in breast cancer — flows through seven stages of global infrastructure to enrich 50+ databases and change clinical practice worldwide.</div>
+        <div class="work-meta">
+          <span class="work-chip">7 Stages</span>
+          <span class="work-chip">Case Study: PTEN</span>
+          <span class="work-chip">INSDC Architecture</span>
+          <span class="work-chip">Editorial Design</span>
+        </div>
+      </div>
+      <div class="work-arrow">↗</div>
+    </a>
+
+    <a href="drug-discovery-pipeline.html" class="work-card" target="_blank">
+      <div class="work-num">04</div>
+      <div class="work-body">
+        <div class="work-tag">Pipeline Schematic</div>
+        <div class="work-title">From Molecule <em>to Market</em></div>
+        <div class="work-desc">The complete drug discovery and development pipeline — 10 stages from basic science to post-market surveillance. Real attrition statistics, failure reasons, the role of AI, and every database involved at each stage.</div>
+        <div class="work-meta">
+          <span class="work-chip">10 Stages</span>
+          <span class="work-chip">Attrition Funnel</span>
+          <span class="work-chip">AI in Drug Discovery</span>
+          <span class="work-chip">Expandable Cards</span>
+        </div>
+      </div>
+      <div class="work-arrow">↗</div>
+    </a>
+
+  </div>
+</section>
+
+<section class="about" id="about">
+  <div class="about-left">
+    <div class="about-label">About This Publication</div>
+    <h2 class="about-heading">Science explained<br><em>without losing its depth</em></h2>
+    <p class="about-text">
+      This is a publication for people who want to understand science as a <strong>system</strong> — not just its conclusions. Every schematic here is built from primary sources, real database architectures, and the actual infrastructure that makes modern science possible.<br><br>
+      The goal is not to simplify. It is to <strong>make visible what is usually invisible</strong> — the networks, the pipelines, the global agreements that allow a mutation discovered in London to change a treatment protocol in Tokyo within a year.
+    </p>
+  </div>
+  <div class="about-right">
+    <div class="about-stat">
+      <div class="stat-big">64+</div>
+      <div class="stat-desc">Scientific databases mapped, annotated, and linked across 17 disciplines — from genomics to botany.</div>
+    </div>
+    <div class="about-stat">
+      <div class="stat-big">35M+</div>
+      <div class="stat-desc">Biomedical citations in PubMed — the literature backbone that connects all of science.</div>
+    </div>
+    <div class="about-stat">
+      <div class="stat-big">1 in 20,000</div>
+      <div class="stat-desc">Compounds screened that eventually become an approved drug. The pipeline is brutal. Understanding it matters.</div>
+    </div>
+  </div>
+</section>
+
+<section class="coming" id="coming">
+  <div class="coming-label">In Development · Coming Next</div>
+  <div class="coming-grid">
+    <div class="coming-card">
+      <div class="coming-title">The CRISPR Revolution</div>
+      <div class="coming-sub">Gene editing — mechanism to medicine</div>
+      <div class="coming-badge">Soon</div>
+    </div>
+    <div class="coming-card">
+      <div class="coming-title">How mRNA Vaccines Work</div>
+      <div class="coming-sub">From sequence to immunity</div>
+      <div class="coming-badge">Soon</div>
+    </div>
+    <div class="coming-card">
+      <div class="coming-title">The Microbiome Map</div>
+      <div class="coming-sub">Gut flora, databases & disease</div>
+      <div class="coming-badge">Soon</div>
+    </div>
+    <div class="coming-card">
+      <div class="coming-title">Epigenetics Explained</div>
+      <div class="coming-sub">How environment writes on DNA</div>
+      <div class="coming-badge">Soon</div>
+    </div>
+    <div class="coming-card">
+      <div class="coming-title">The Cancer Genome Atlas</div>
+      <div class="coming-sub">A visual tour of TCGA</div>
+      <div class="coming-badge">Soon</div>
+    </div>
+    <div class="coming-card">
+      <div class="coming-title">AlphaFold & the Protein Fold</div>
+      <div class="coming-sub">How AI solved a 50-year problem</div>
+      <div class="coming-badge">Soon</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">The Architecture of Science</div>
+    <div class="footer-copy">Built with curiosity · 2025</div>
+    <div class="footer-links">
+      <a href="#works">Schematics</a>
+      <a href="#about">About</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Cursor
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursor-ring');
+let mx = 0, my = 0, rx = 0, ry = 0;
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx + 'px';
+  cursor.style.top = my + 'px';
+});
+
+(function animRing() {
+  rx += (mx - rx) * 0.12;
+  ry += (my - ry) * 0.12;
+  ring.style.left = rx + 'px';
+  ring.style.top = ry + 'px';
+  requestAnimationFrame(animRing);
+})();
+
+// Loader
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('loader').classList.add('done');
+  }, 1400);
+});
+
+// Scroll animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      setTimeout(() => entry.target.classList.add('visible'), entry.target.dataset.delay || 0);
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.manifesto-item').forEach((el, i) => {
+  el.dataset.delay = i * 100;
+  observer.observe(el);
+});
+
+document.querySelectorAll('.work-card').forEach((el, i) => {
+  el.dataset.delay = i * 120;
+  observer.observe(el);
+});
+</script>
+
+</body>
+</html>

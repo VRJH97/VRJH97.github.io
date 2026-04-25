@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Architecture of Science — Database Knowledge Graph</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #060911;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.07);
+    --text: #c8d0dc;
+    --muted: #4a5568;
+    --accent: #7eb8d4;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'EB Garamond', Georgia, serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    cursor: grab;
+  }
+  #canvas-container:active { cursor: grabbing; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Top bar */
+  #topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(180deg, rgba(6,9,17,0.95) 0%, rgba(6,9,17,0) 100%);
+    pointer-events: none;
+  }
+
+  #title-block { pointer-events: none; }
+
+  #title-block h1 {
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: #e8ecf4;
+    font-style: italic;
+  }
+  #title-block p {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  /* Controls */
+  #controls {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 8px;
+    background: rgba(6,9,17,0.85);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 8px 16px;
+    backdrop-filter: blur(12px);
+    pointer-events: all;
+  }
+
+  .ctrl-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    padding: 5px 14px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .ctrl-btn:hover, .ctrl-btn.active {
+    color: var(--accent);
+    border-color: rgba(126,184,212,0.3);
+    background: rgba(126,184,212,0.06);
+  }
+
+  /* Info panel */
+  #info-panel {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 300px;
+    background: rgba(6,9,17,0.92);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    z-index: 100;
+    backdrop-filter: blur(16px);
+    transition: all 0.3s ease;
+    pointer-events: all;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  #info-panel.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(20px);
+  }
+
+  #info-panel h2 {
+    font-size: 18px;
+    font-style: italic;
+    color: #e8ecf4;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+  #info-panel .panel-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  #info-panel p {
+    font-size: 13px;
+    line-height: 1.65;
+    color: #8a9ab0;
+    font-style: italic;
+    margin-bottom: 14px;
+  }
+  #info-panel .connections-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  #info-panel .conn-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 10px;
+    margin: 3px 3px 0 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #667788;
+  }
+  #info-panel .data-flows {
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  #info-panel .flow-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #7a8a9a;
+  }
+  #info-panel .flow-arrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  #close-panel {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+  }
+
+  /* Legend */
+  #legend {
+    position: fixed;
+    left: 20px;
+    bottom: 80px;
+    z-index: 100;
+    background: rgba(6,9,17,0.88);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+  }
+  #legend h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #556677;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-ring {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid;
+    flex-shrink: 0;
+  }
+
+  /* Minimap */
+  #minimap {
+    position: fixed;
+    left: 20px;
+    top: 60px;
+    z-index: 100;
+    background: rgba(6,9,17,0.88);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 130px;
+    height: 90px;
+  }
+  #minimap canvas {
+    width: 130px;
+    height: 90px;
+  }
+
+  #hint {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+    pointer-events: none;
+    letter-spacing: 0.06em;
+    line-height: 1.8;
+  }
+
+  /* Scrollbar for panel */
+  #info-panel::-webkit-scrollbar { width: 4px; }
+  #info-panel::-webkit-scrollbar-track { background: transparent; }
+  #info-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="title-block">
+    <h1>The Architecture of Science</h1>
+    <p>Database Knowledge Graph — How Scientific Information Flows</p>
+  </div>
+</div>
+
+<div id="canvas-container">
+  <canvas id="main-canvas"></canvas>
+</div>
+
+<canvas id="minimap-canvas" style="display:none"></canvas>
+<div id="minimap"><canvas id="mini-canvas"></canvas></div>
+
+<div id="info-panel" class="hidden">
+  <button id="close-panel" onclick="closePanel()">✕</button>
+  <h2 id="panel-title">Node</h2>
+  <div class="panel-type" id="panel-type"></div>
+  <p id="panel-desc"></p>
+  <div id="panel-connections"></div>
+  <div id="panel-flows" class="data-flows"></div>
+</div>
+
+<div id="legend">
+  <h3>Node Types</h3>
+  <div class="legend-row"><div class="legend-dot" style="background:#e8c97d;width:18px;height:18px;border-radius:50%;opacity:0.9"></div>Core Discipline Hub</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#7eb8d4;width:13px;height:13px"></div>Primary Database</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#9bcfa8;width:10px;height:10px"></div>Specialist DB</div>
+  <div class="legend-row" style="margin-top:8px"><div style="width:28px;height:2px;background:rgba(126,184,212,0.5);border-radius:1px"></div>Data feeds into</div>
+  <div class="legend-row"><div style="width:28px;height:2px;background:rgba(200,150,100,0.4);border-radius:1px;border-top:1px dashed rgba(200,150,100,0.5)"></div>Cross-references</div>
+  <div class="legend-row"><div style="width:28px;height:2px;background:rgba(150,200,150,0.35);border-radius:1px"></div>Aggregates from</div>
+</div>
+
+<div id="controls">
+  <button class="ctrl-btn active" onclick="setFilter('all')">All Fields</button>
+  <button class="ctrl-btn" onclick="setFilter('genomics')">Genomics</button>
+  <button class="ctrl-btn" onclick="setFilter('chemistry')">Chemistry</button>
+  <button class="ctrl-btn" onclick="setFilter('clinical')">Clinical</button>
+  <button class="ctrl-btn" onclick="setFilter('botany')">Botany</button>
+  <button class="ctrl-btn" onclick="setFilter('omics')">Multi-omics</button>
+  <button class="ctrl-btn" onclick="resetView()">⟳ Reset</button>
+</div>
+
+<div id="hint">
+  Drag to pan &nbsp;·&nbsp; Scroll to zoom<br>
+  Click a node to explore
+</div>
+
+<script>
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+const miniCanvas = document.getElementById('mini-canvas');
+const miniCtx = miniCanvas.getContext('2d');
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const NODES = [
+  // ── DISCIPLINE HUBS (type: hub) ──
+  { id: 'hub_life', label: 'Life Sciences', type: 'hub', group: 'all', color: '#e8c97d', size: 32, desc: 'The broadest domain encompassing all biological knowledge — from molecules to ecosystems. All other biological disciplines branch from here and ultimately feed back into it.', flows: ['↓ Branches into Genomics, Proteomics, Cell Biology, Ecology', '↑ Receives data from all specialised databases', '↔ Informs Clinical Medicine and Agriculture'] },
+  { id: 'hub_chem', label: 'Chemistry', type: 'hub', group: 'chemistry', color: '#d4a76a', size: 28, desc: 'The central science linking physics to biology. Provides the molecular language for understanding all biological processes.', flows: ['→ Molecular structures feed Pharmacology', '→ Reaction data feeds Biochemistry', '→ Chemical biology bridges to Genomics via nucleic acids'] },
+  { id: 'hub_physics', label: 'Physics & Imaging', type: 'hub', group: 'all', color: '#b0c4de', size: 24, desc: 'Provides the instrumentation foundations: crystallography, cryo-EM, NMR, and medical imaging. Structural biology and neuroscience imaging depend on physics.', flows: ['→ X-ray crystallography feeds PDB', '→ NMR data feeds BMRB', '→ Imaging modalities feed Neuroscience DBs'] },
+  { id: 'hub_informatics', label: 'Bioinformatics', type: 'hub', group: 'omics', color: '#a89cc8', size: 26, desc: 'The computational layer that integrates and interprets all biological data. Without bioinformatics, raw data from sequencers, mass specs, and imaging cannot be understood.', flows: ['← Receives raw data from all experimental databases', '→ Produces processed annotations for GenBank, UniProt, KEGG', '→ Powers machine learning predictions (AlphaFold)'] },
+  { id: 'hub_medicine', label: 'Clinical Medicine', type: 'hub', group: 'clinical', color: '#c87d7d', size: 26, desc: 'Translates basic science discoveries into patient outcomes. Relies on molecular databases for drug targets, genetic databases for diagnostics, and clinical trial registries for evidence.', flows: ['← Receives variant calls from ClinVar, OMIM', '← Receives drug data from DrugBank, ChEMBL', '→ Generates clinical data that feeds back into genomic databases'] },
+  { id: 'hub_ecology', label: 'Ecology & Evolution', type: 'hub', group: 'botany', color: '#7aaa88', size: 22, desc: 'Studies life at the population, community, and ecosystem scale. Draws from taxonomy databases, occurrence records, and genomics to understand biodiversity and evolutionary history.', flows: ['← Draws species data from GBIF, IUCN', '← Uses phylogenetics from genomics', '→ Informs conservation policy'] },
+  { id: 'hub_botany', label: 'Plant Sciences', type: 'hub', group: 'botany', color: '#8db87a', size: 22, desc: 'Studies the biology, taxonomy, chemistry, and ecology of plants. Uniquely bridges ecology, chemistry (secondary metabolites), and genomics.', flows: ['← TAIR, Phytozome for genome data', '← POWO, Tropicos for taxonomy', '→ PlantCyc for metabolic pathways', '→ Agriculture and food science'] },
+
+  // ── SEQUENCE / GENOMICS LAYER ──
+  { id: 'genbank', label: 'GenBank', type: 'primary', group: 'genomics', color: '#5ba3c9', size: 20, desc: 'The foundational nucleotide sequence archive (NCBI). All sequenced DNA and RNA is deposited here. The starting point for genomic analysis worldwide.', flows: ['← Receives sequences from every sequencing lab globally', '→ Feeds Ensembl (annotation)', '→ Feeds BLAST (search)', '→ Partners with ENA (Europe) and DDBJ (Japan) via INSDC'] },
+  { id: 'ensembl', label: 'Ensembl', type: 'primary', group: 'genomics', color: '#5ba3c9', size: 18, desc: 'Automatic genome annotation built on GenBank sequences. Adds gene models, regulatory features, and comparative genomics to raw sequences.', flows: ['← Raw sequences from GenBank/ENA', '→ Annotated genomes feed UniProt, STRING', '→ Variants annotated and passed to VEP (Variant Effect Predictor)'] },
+  { id: 'dbsnp', label: 'dbSNP / ClinVar', type: 'specialist', group: 'genomics', color: '#4a90c0', size: 14, desc: 'dbSNP catalogs single nucleotide variants (now billions). ClinVar classifies variants by clinical significance. Together they form the bridge between genomics and medicine.', flows: ['← Variant calls from sequencing studies', '→ ClinVar feeds clinical decision-making', '→ GWAS Catalog draws from dbSNP'] },
+  { id: 'gwas', label: 'GWAS Catalog', type: 'specialist', group: 'genomics', color: '#4a90c0', size: 13, desc: 'Aggregates results from genome-wide association studies — linking genetic variants to traits and diseases. Data from 7,000+ papers.', flows: ['← Variant data from dbSNP', '← Study metadata from publications', '→ Risk loci feed clinical databases', '→ Informs drug target identification'] },
+  { id: 'tcga', label: 'TCGA / GEO', type: 'specialist', group: 'genomics', color: '#c07a7a', size: 15, desc: 'TCGA: multi-omic cancer data. GEO: gene expression archive. Together they provide the raw multi-dimensional data for cancer and functional genomics research.', flows: ['← Sequencing, methylation, expression data from cancer labs', '→ cBioPortal visualises and interprets TCGA', '→ Expression data feeds downstream pathway analysis'] },
+  { id: 'encode', label: 'ENCODE / Roadmap', type: 'specialist', group: 'omics', color: '#9b7ab8', size: 14, desc: 'Maps functional elements in the genome: histone modifications, TF binding, chromatin accessibility, and DNA methylation across hundreds of cell types.', flows: ['← ChIP-seq, ATAC-seq, bisulfite sequencing data', '→ Chromatin state annotations feed Ensembl', '→ Regulatory element maps used in GWAS interpretation'] },
+  { id: 'human_cell_atlas', label: 'Human Cell Atlas', type: 'specialist', group: 'omics', color: '#8a9fd4', size: 14, desc: 'Reference maps of all human cell types integrating scRNA-seq, spatial transcriptomics, and proteomics. A single-cell resolution map of the human body.', flows: ['← Single-cell RNA-seq from labs globally', '← Spatial transcriptomics data', '→ Cell type definitions feed clinical databases', '→ Disease atlases link to TCGA, ClinVar'] },
+
+  // ── PROTEIN LAYER ──
+  { id: 'uniprot', label: 'UniProt', type: 'primary', group: 'omics', color: '#c87ab4', size: 19, desc: 'The central hub for protein knowledge. Integrates sequence (from GenBank), structure (from PDB), function (from literature), and interaction (from STRING) into unified protein records.', flows: ['← Protein sequences derived from GenBank translations', '← Manually curated from literature (Swiss-Prot)', '→ Feeds STRING (interactions)', '→ Feeds PDB cross-references', '→ Feeds InterPro domains', '→ Feeds AlphaFold predictions'] },
+  { id: 'pdb', label: 'Protein Data Bank', type: 'primary', group: 'omics', color: '#c87ab4', size: 17, desc: 'The archive for experimentally determined 3D structures of proteins, nucleic acids, and complexes. The ground truth for structural biology.', flows: ['← Coordinates from crystallography, cryo-EM, NMR', '→ Structures cross-referenced in UniProt', '→ Serves as training data for AlphaFold', '→ BindingDB uses PDB structures for drug binding analysis'] },
+  { id: 'alphafold', label: 'AlphaFold DB', type: 'specialist', group: 'omics', color: '#b068b0', size: 15, desc: 'AI-predicted protein structures for essentially all known proteins. Trained on PDB, it extends structural coverage to proteins that have never been crystallised.', flows: ['← Trained on PDB experimental structures', '← Sequences sourced from UniProt', '→ Predicted structures feed drug discovery pipelines', '→ Enables structural genomics at proteome scale'] },
+  { id: 'string', label: 'STRING', type: 'specialist', group: 'omics', color: '#c87ab4', size: 13, desc: 'Protein–protein interaction network database. Integrates physical, functional, and regulatory interactions from experiments, text-mining, and database cross-references.', flows: ['← Experimental PPI data from literature', '← Co-expression data from gene expression databases', '→ Networks used in pathway enrichment analysis', '→ Feeds systems biology models'] },
+  { id: 'interpro', label: 'InterPro / Pfam', type: 'specialist', group: 'omics', color: '#b870a8', size: 12, desc: 'Classifies protein sequences into families and identifies conserved domains and sites. A critical step in automated genome annotation.', flows: ['← Sequence data from UniProt', '→ Domain assignments enrich Ensembl gene models', '→ Family classifications link to KEGG pathways'] },
+
+  // ── CHEMISTRY LAYER ──
+  { id: 'pubchem', label: 'PubChem', type: 'primary', group: 'chemistry', color: '#c8a050', size: 18, desc: 'NCBI\'s chemical database with 100M+ compounds. The open-access anchor of chemical biology — linking structures to bioassay data, patents, and literature.', flows: ['← Compounds deposited from 1,000+ sources', '→ Bioactivity data feeds ChEMBL, DrugBank', '→ Chemical structures cross-referenced in KEGG, HMDB', '→ Feeds PubMed chemical entity tagging'] },
+  { id: 'chembl', label: 'ChEMBL', type: 'primary', group: 'chemistry', color: '#c8a050', size: 16, desc: 'Bioactivity database of drug-like molecules with binding, functional, and ADMET data extracted from medicinal chemistry literature.', flows: ['← Bioactivity data extracted from published papers', '← Structure data from PubChem', '→ Drug candidates feed DrugBank', '→ Target data links to UniProt, ChEMBL targets'] },
+  { id: 'reaxys', label: 'Reaxys / SciFinder', type: 'primary', group: 'chemistry', color: '#d4a030', size: 15, desc: 'Commercial databases containing the deepest reaction and synthesis information, merging Beilstein, Gmelin, and patent chemistry.', flows: ['← Reactions extracted from primary literature and patents', '→ Synthesis routes used in drug synthesis planning', '→ Chemical property data used in computational chemistry'] },
+  { id: 'kegg', label: 'KEGG', type: 'primary', group: 'omics', color: '#b8904a', size: 17, desc: 'Kyoto Encyclopedia of Genes and Genomes. The definitive database linking genes to functions via metabolic pathways. KEGG maps are used in virtually every omics study.', flows: ['← Gene/enzyme data from UniProt, GenBank', '← Compound data from PubChem', '→ Pathway maps used in RNA-seq, metabolomics analysis', '→ Drug–target–pathway links feed pharmacology'] },
+  { id: 'hmdb', label: 'HMDB', type: 'specialist', group: 'omics', color: '#a8802a', size: 14, desc: 'Human Metabolome Database. 220,000+ metabolite entries with chemical, spectral, clinical, and biological data. The reference for human metabolomics studies.', flows: ['← Metabolite data from NMR, mass spectrometry studies', '← Chemical structures from PubChem', '→ Metabolite–disease associations feed clinical databases', '→ Pathway links to KEGG, MetaCyc'] },
+  { id: 'metabolights', label: 'MetaboLights', type: 'specialist', group: 'omics', color: '#a07020', size: 12, desc: 'EMBL-EBI metabolomics data repository. Standardised deposition format ensures interoperability with genomics and proteomics repositories.', flows: ['← Raw metabolomics data (LC-MS, NMR) from publications', '→ Processed data linked to MetaCyc, HMDB pathways', '→ Integrated with PRIDE (proteomics) for multi-omics studies'] },
+
+  // ── PHARMACOLOGY LAYER ──
+  { id: 'drugbank', label: 'DrugBank', type: 'primary', group: 'clinical', color: '#c87070', size: 17, desc: 'Comprehensive drug information: mechanisms, targets, interactions, pharmacokinetics. The bridge between chemistry and clinical medicine.', flows: ['← Drug structures from PubChem, ChEMBL', '← Target proteins from UniProt', '← Clinical data from FDA, EMA', '→ Drug–drug interactions feed clinical decision support', '→ Target data links to OMIM for genetic disease context'] },
+  { id: 'iuphar', label: 'IUPHAR / Guide to Pharmacology', type: 'specialist', group: 'clinical', color: '#d06060', size: 13, desc: 'Expert-curated receptor, ion channel, transporter, and enzyme database with quantitative pharmacology data. The pharmacologist\'s reference standard.', flows: ['← Curated from primary pharmacology literature', '→ Receptor–ligand data feeds drug target databases', '→ Links to PDB for structure, UniProt for target identity'] },
+
+  // ── CLINICAL LAYER ──
+  { id: 'omim', label: 'OMIM', type: 'primary', group: 'clinical', color: '#d07060', size: 16, desc: 'Online Mendelian Inheritance in Man. The authoritative catalogue linking genes to genetic disorders. Curated since 1966 — the oldest continuously maintained genetics resource.', flows: ['← Gene–disease evidence curated from literature', '← Variant data from ClinVar, dbSNP', '→ Disease gene lists feed clinical genetic testing', '→ Links to NCBI Gene, UniProt protein records'] },
+  { id: 'clinicaltrials', label: 'ClinicalTrials.gov', type: 'specialist', group: 'clinical', color: '#c06868', size: 13, desc: '490,000+ registered clinical studies. The registry that tracks what evidence is being generated — making the translational pipeline visible.', flows: ['← Study protocols registered by investigators', '→ Results feed meta-analyses and systematic reviews', '→ Drugs tested link back to DrugBank, PubChem'] },
+  { id: 'cbioportal', label: 'cBioPortal', type: 'specialist', group: 'clinical', color: '#b85858', size: 14, desc: 'Interactive explorer of cancer genomics datasets. Visualises TCGA and other studies with survival analysis, mutation landscapes, and pathway views.', flows: ['← Processed cancer genomic data from TCGA, GEO', '← Pathway annotations from KEGG, Reactome', '→ Enables clinical correlation of molecular findings', '→ Informs precision oncology trial design'] },
+  { id: 'reactome', label: 'Reactome', type: 'specialist', group: 'omics', color: '#d07890', size: 13, desc: 'Curated human biological pathway database. Every reaction is manually annotated with participants (proteins, chemicals) and cross-referenced to UniProt, ChEMBL, PubChem.', flows: ['← Pathway reactions curated from literature', '← Protein participants from UniProt', '← Compounds from ChEMBL, PubChem', '→ Pathway analysis tool for RNA-seq, proteomics data', '→ Links to KEGG for cross-pathway validation'] },
+
+  // ── BOTANY LAYER ──
+  { id: 'powo', label: 'POWO (Kew)', type: 'primary', group: 'botany', color: '#70b870', size: 17, desc: 'Plants of the World Online. 250 years of botanical exploration digitised — taxonomy, distribution, traits, threat status, and molecular phylogenies for all vascular plants.', flows: ['← Taxonomic treatments from Kew, partner herbaria', '← Specimen data from JSTOR Global Plants', '→ Species names standardise GBIF occurrence records', '→ Threat status informs IUCN Red List'] },
+  { id: 'tropicos', label: 'Tropicos', type: 'specialist', group: 'botany', color: '#60a860', size: 14, desc: 'Missouri Botanical Garden\'s nomenclature database. 1.33M scientific names, 4.87M specimens, 685K images. Cross-references with IPNI for name validation.', flows: ['← Specimen data from herbaria worldwide', '← Literature from BHL', '→ Names validate against IPNI', '→ Specimen occurrence feeds GBIF'] },
+  { id: 'tair', label: 'TAIR', type: 'specialist', group: 'botany', color: '#70b870', size: 13, desc: 'Arabidopsis thaliana genomics, expression, and mutant data. The model plant database that anchors plant molecular biology.', flows: ['← Sequence data from GenBank', '← Expression data from GEO', '→ Gene function annotations feed Phytozome comparative analysis', '→ Mutant data informs crop improvement'] },
+  { id: 'phytozome', label: 'Phytozome', type: 'specialist', group: 'botany', color: '#60a060', size: 12, desc: '65+ sequenced and annotated plant genomes. Enables comparative genomics across the plant kingdom.', flows: ['← Genome sequences deposited from plant genomics projects', '← Gene models annotated using TAIR as reference', '→ Orthology data feeds evolutionary studies', '→ Crop genome data links to agriculture databases'] },
+  { id: 'gbif', label: 'GBIF', type: 'specialist', group: 'botany', color: '#50985a', size: 14, desc: 'Global Biodiversity Information Facility. Aggregates occurrence records from museums, herbaria, and citizen science. The planetary map of where species exist.', flows: ['← Specimen records from herbaria, museums globally', '← Citizen science observations (iNaturalist)', '→ Species names validated against POWO, IPNI', '→ Occurrence data feeds ecological modelling'] },
+  { id: 'plantcyc', label: 'PlantCyc / PMN', type: 'specialist', group: 'botany', color: '#68b068', size: 12, desc: 'Plant metabolic pathway databases covering primary and secondary metabolism in plants. Bridges plant genomics to plant chemistry.', flows: ['← Gene/enzyme data from TAIR, Phytozome', '← Compound data from PubChem, HMDB', '→ Pathway maps used in plant metabolomics', '→ Secondary metabolite pathways link to medicinal plant research'] },
+  { id: 'bhl', label: 'BHL / Botanicus', type: 'specialist', group: 'botany', color: '#789870', size: 11, desc: 'Biodiversity Heritage Library and Botanicus. Millions of pages of digitised natural history and botanical literature, including original species descriptions from the 16th–20th century.', flows: ['← Digitised from partner natural history libraries', '→ Historical taxonomy links to current nomenclature in POWO', '→ Original species descriptions validate modern taxonomic decisions'] },
+
+  // ── MULTI-OMICS / INTEGRATORS ──
+  { id: 'ncbi', label: 'NCBI Portal', type: 'primary', group: 'all', color: '#7890d0', size: 22, desc: 'The US National Center for Biotechnology Information — the world\'s largest biomedical data infrastructure. Hosts GenBank, PubMed, dbSNP, GEO, PubChem, and dozens of sub-databases. The central nervous system of global biological data.', flows: ['← Data deposits from researchers globally', '→ Serves as backbone for most bioinformatics workflows', '↔ Partners with EMBL-EBI (Europe) and DDBJ (Japan) via INSDC'] },
+  { id: 'embl_ebi', label: 'EMBL-EBI', type: 'primary', group: 'all', color: '#7890d0', size: 21, desc: 'European Bioinformatics Institute. Europe\'s counterpart to NCBI. Hosts UniProt, Ensembl, PDB-Europe, ChEMBL, MetaboLights, ArrayExpress. Critical for global data interoperability.', flows: ['← European research deposits', '↔ Mirrors and complements NCBI databases via INSDC', '→ Provides ExPASy, SWISS-MODEL, InterPro tools'] },
+  { id: 'exapsy', label: 'ExPASy / SIB', type: 'specialist', group: 'omics', color: '#9890c8', size: 13, desc: 'Swiss Institute of Bioinformatics portal. Free access to 160+ databases and tools including SWISS-MODEL, PROSITE, STRING, and UniProtKB.', flows: ['← Aggregates Swiss and European database resources', '→ SWISS-MODEL feeds homology models to PDB, UniProt', '→ Provides computational tools that process data from all major databases'] },
+  { id: 'pubmed', label: 'PubMed / Literature', type: 'primary', group: 'all', color: '#9090b0', size: 20, desc: '35M+ biomedical citations. The literature backbone that connects all databases — database records link to the papers that generated, validated, or interpreted the data.', flows: ['← All published life science research', '→ Papers cited in every major database record', '→ Text-mining feeds automated database population', '→ Links to full text via PMC (open access)'] },
+];
+
+const EDGES = [
+  // GenBank connections
+  { from: 'ncbi', to: 'genbank', type: 'hosts', weight: 3 },
+  { from: 'ncbi', to: 'dbsnp', type: 'hosts', weight: 2 },
+  { from: 'ncbi', to: 'tcga', type: 'hosts', weight: 2 },
+  { from: 'ncbi', to: 'pubmed', type: 'hosts', weight: 3 },
+  { from: 'ncbi', to: 'pubchem', type: 'hosts', weight: 2 },
+  { from: 'genbank', to: 'ensembl', type: 'feeds', weight: 3 },
+  { from: 'genbank', to: 'uniprot', type: 'feeds', weight: 3 },
+  { from: 'genbank', to: 'tair', type: 'feeds', weight: 2 },
+  { from: 'genbank', to: 'phytozome', type: 'feeds', weight: 2 },
+  { from: 'ensembl', to: 'dbsnp', type: 'feeds', weight: 2 },
+  { from: 'ensembl', to: 'interpro', type: 'feeds', weight: 2 },
+  { from: 'ensembl', to: 'encode', type: 'xref', weight: 2 },
+  { from: 'dbsnp', to: 'gwas', type: 'feeds', weight: 2 },
+  { from: 'dbsnp', to: 'omim', type: 'xref', weight: 2 },
+  { from: 'gwas', to: 'hub_medicine', type: 'feeds', weight: 2 },
+  { from: 'tcga', to: 'cbioportal', type: 'feeds', weight: 3 },
+  { from: 'encode', to: 'hub_informatics', type: 'feeds', weight: 2 },
+
+  // Protein connections
+  { from: 'embl_ebi', to: 'uniprot', type: 'hosts', weight: 3 },
+  { from: 'embl_ebi', to: 'pdb', type: 'hosts', weight: 2 },
+  { from: 'embl_ebi', to: 'chembl', type: 'hosts', weight: 2 },
+  { from: 'embl_ebi', to: 'interpro', type: 'hosts', weight: 2 },
+  { from: 'embl_ebi', to: 'metabolights', type: 'hosts', weight: 2 },
+  { from: 'embl_ebi', to: 'ensembl', type: 'hosts', weight: 2 },
+  { from: 'uniprot', to: 'pdb', type: 'xref', weight: 3 },
+  { from: 'uniprot', to: 'string', type: 'feeds', weight: 2 },
+  { from: 'uniprot', to: 'interpro', type: 'feeds', weight: 2 },
+  { from: 'uniprot', to: 'kegg', type: 'xref', weight: 2 },
+  { from: 'uniprot', to: 'alphafold', type: 'feeds', weight: 3 },
+  { from: 'pdb', to: 'alphafold', type: 'feeds', weight: 3 },
+  { from: 'pdb', to: 'hub_physics', type: 'receives', weight: 2 },
+  { from: 'string', to: 'reactome', type: 'xref', weight: 2 },
+  { from: 'interpro', to: 'hub_informatics', type: 'feeds', weight: 2 },
+
+  // Chemistry connections
+  { from: 'pubchem', to: 'chembl', type: 'xref', weight: 3 },
+  { from: 'pubchem', to: 'drugbank', type: 'feeds', weight: 2 },
+  { from: 'pubchem', to: 'kegg', type: 'xref', weight: 2 },
+  { from: 'pubchem', to: 'hmdb', type: 'xref', weight: 2 },
+  { from: 'chembl', to: 'drugbank', type: 'feeds', weight: 2 },
+  { from: 'chembl', to: 'reactome', type: 'xref', weight: 2 },
+  { from: 'kegg', to: 'hmdb', type: 'xref', weight: 2 },
+  { from: 'kegg', to: 'reactome', type: 'xref', weight: 3 },
+  { from: 'kegg', to: 'plantcyc', type: 'xref', weight: 2 },
+  { from: 'hmdb', to: 'metabolights', type: 'xref', weight: 2 },
+  { from: 'reaxys', to: 'hub_chem', type: 'feeds', weight: 2 },
+
+  // Clinical connections
+  { from: 'drugbank', to: 'hub_medicine', type: 'feeds', weight: 3 },
+  { from: 'drugbank', to: 'iuphar', type: 'xref', weight: 2 },
+  { from: 'omim', to: 'hub_medicine', type: 'feeds', weight: 3 },
+  { from: 'omim', to: 'drugbank', type: 'xref', weight: 2 },
+  { from: 'cbioportal', to: 'reactome', type: 'uses', weight: 2 },
+  { from: 'clinicaltrials', to: 'hub_medicine', type: 'feeds', weight: 2 },
+  { from: 'reactome', to: 'hub_medicine', type: 'feeds', weight: 2 },
+  { from: 'iuphar', to: 'pdb', type: 'xref', weight: 2 },
+
+  // Botany connections
+  { from: 'powo', to: 'gbif', type: 'feeds', weight: 2 },
+  { from: 'powo', to: 'tropicos', type: 'xref', weight: 2 },
+  { from: 'powo', to: 'hub_botany', type: 'feeds', weight: 3 },
+  { from: 'tropicos', to: 'gbif', type: 'feeds', weight: 2 },
+  { from: 'tropicos', to: 'bhl', type: 'uses', weight: 2 },
+  { from: 'tair', to: 'phytozome', type: 'feeds', weight: 2 },
+  { from: 'tair', to: 'plantcyc', type: 'feeds', weight: 2 },
+  { from: 'phytozome', to: 'hub_botany', type: 'feeds', weight: 2 },
+  { from: 'gbif', to: 'hub_ecology', type: 'feeds', weight: 3 },
+  { from: 'plantcyc', to: 'hmdb', type: 'xref', weight: 2 },
+  { from: 'bhl', to: 'powo', type: 'feeds', weight: 2 },
+
+  // Hubs to hubs
+  { from: 'hub_life', to: 'hub_chem', type: 'informs', weight: 2 },
+  { from: 'hub_life', to: 'hub_medicine', type: 'informs', weight: 3 },
+  { from: 'hub_life', to: 'hub_ecology', type: 'informs', weight: 2 },
+  { from: 'hub_life', to: 'hub_botany', type: 'informs', weight: 2 },
+  { from: 'hub_chem', to: 'hub_life', type: 'informs', weight: 2 },
+  { from: 'hub_chem', to: 'hub_medicine', type: 'informs', weight: 2 },
+  { from: 'hub_informatics', to: 'hub_life', type: 'enables', weight: 2 },
+  { from: 'hub_physics', to: 'hub_life', type: 'enables', weight: 2 },
+  { from: 'hub_ecology', to: 'hub_botany', type: 'informs', weight: 2 },
+  { from: 'ncbi', to: 'embl_ebi', type: 'xref', weight: 3 },
+  { from: 'pubmed', to: 'hub_informatics', type: 'feeds', weight: 2 },
+  { from: 'pubmed', to: 'hub_life', type: 'feeds', weight: 2 },
+  { from: 'exapsy', to: 'embl_ebi', type: 'xref', weight: 2 },
+  { from: 'human_cell_atlas', to: 'hub_life', type: 'feeds', weight: 2 },
+  { from: 'human_cell_atlas', to: 'hub_medicine', type: 'feeds', weight: 2 },
+];
+
+// ─── LAYOUT ──────────────────────────────────────────────────────────────────
+// Fixed positions (radial layout)
+const W = 2800, H = 2000;
+const CX = W / 2, CY = H / 2;
+
+function polar(cx, cy, r, angleDeg) {
+  const a = angleDeg * Math.PI / 180;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+
+// Assign positions
+const posMap = {
+  // Center
+  hub_life: { x: CX, y: CY },
+  // Ring 1 - major hubs
+  hub_chem: polar(CX, CY, 240, 30),
+  hub_physics: polar(CX, CY, 240, 330),
+  hub_informatics: polar(CX, CY, 240, 210),
+  hub_medicine: polar(CX, CY, 240, 120),
+  hub_ecology: polar(CX, CY, 240, 240),
+  hub_botany: polar(CX, CY, 240, 170),
+  // Ring 2 - primary databases
+  ncbi: polar(CX, CY, 440, 350),
+  embl_ebi: polar(CX, CY, 440, 290),
+  pubmed: polar(CX, CY, 440, 0),
+  genbank: polar(CX, CY, 600, 340),
+  ensembl: polar(CX, CY, 580, 310),
+  uniprot: polar(CX, CY, 560, 260),
+  pdb: polar(CX, CY, 600, 290),
+  pubchem: polar(CX, CY, 540, 50),
+  kegg: polar(CX, CY, 500, 80),
+  drugbank: polar(CX, CY, 520, 130),
+  omim: polar(CX, CY, 500, 110),
+  reactome: polar(CX, CY, 460, 160),
+  powo: polar(CX, CY, 530, 185),
+  // Ring 3 - specialist databases
+  alphafold: polar(CX, CY, 760, 270),
+  string: polar(CX, CY, 700, 255),
+  interpro: polar(CX, CY, 700, 240),
+  dbsnp: polar(CX, CY, 720, 320),
+  gwas: polar(CX, CY, 760, 335),
+  tcga: polar(CX, CY, 740, 355),
+  encode: polar(CX, CY, 680, 300),
+  human_cell_atlas: polar(CX, CY, 680, 220),
+  chembl: polar(CX, CY, 660, 60),
+  reaxys: polar(CX, CY, 700, 40),
+  hmdb: polar(CX, CY, 620, 85),
+  metabolights: polar(CX, CY, 700, 95),
+  iuphar: polar(CX, CY, 650, 140),
+  clinicaltrials: polar(CX, CY, 640, 115),
+  cbioportal: polar(CX, CY, 620, 155),
+  exapsy: polar(CX, CY, 640, 275),
+  tropicos: polar(CX, CY, 640, 195),
+  tair: polar(CX, CY, 660, 175),
+  phytozome: polar(CX, CY, 720, 185),
+  gbif: polar(CX, CY, 660, 215),
+  plantcyc: polar(CX, CY, 700, 165),
+  bhl: polar(CX, CY, 740, 200),
+};
+
+NODES.forEach(n => {
+  const p = posMap[n.id] || { x: CX + (Math.random()-0.5)*800, y: CY + (Math.random()-0.5)*600 };
+  n.x = p.x; n.y = p.y;
+  n.vx = 0; n.vy = 0;
+  n.highlighted = false;
+});
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let pan = { x: 0, y: 0 };
+let zoom = 1;
+let dragging = false;
+let lastMouse = null;
+let hoveredNode = null;
+let selectedNode = null;
+let activeFilter = 'all';
+let animFrame = 0;
+let particles = [];
+
+// Init pan to center
+function initView() {
+  const rect = canvas.getBoundingClientRect();
+  pan.x = rect.width / 2 - CX * zoom;
+  pan.y = rect.height / 2 - CY * zoom;
+}
+
+// ─── PARTICLES ───────────────────────────────────────────────────────────────
+function spawnParticles() {
+  EDGES.forEach(e => {
+    if (Math.random() > 0.015) return;
+    const from = NODES.find(n => n.id === e.from);
+    const to = NODES.find(n => n.id === e.to);
+    if (!from || !to) return;
+    particles.push({
+      from, to,
+      t: 0,
+      speed: 0.003 + Math.random() * 0.004,
+      color: e.type === 'feeds' ? '#7eb8d4' : e.type === 'xref' ? '#d4a76a' : '#9bcfa8',
+      size: 2 + Math.random() * 2,
+    });
+  });
+  particles = particles.filter(p => p.t < 1).slice(-120);
+}
+
+function updateParticles() {
+  particles.forEach(p => p.t = Math.min(1, p.t + p.speed));
+  particles = particles.filter(p => p.t < 1);
+}
+
+// ─── CANVAS RESIZE ───────────────────────────────────────────────────────────
+function resize() {
+  canvas.width = window.innerWidth * devicePixelRatio;
+  canvas.height = window.innerHeight * devicePixelRatio;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  miniCanvas.width = 260;
+  miniCanvas.height = 180;
+  initView();
+}
+
+// ─── COORDINATE TRANSFORMS ───────────────────────────────────────────────────
+function worldToScreen(wx, wy) {
+  return { x: wx * zoom + pan.x, y: wy * zoom + pan.y };
+}
+function screenToWorld(sx, sy) {
+  return { x: (sx - pan.x) / zoom, y: (sy - pan.y) / zoom };
+}
+
+// ─── HIT TEST ────────────────────────────────────────────────────────────────
+function hitNode(mx, my) {
+  const w = screenToWorld(mx, my);
+  let best = null, bestD = Infinity;
+  for (const n of NODES) {
+    if (!isNodeVisible(n)) continue;
+    const dx = n.x - w.x, dy = n.y - w.y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    const r = n.size + 8;
+    if (d < r && d < bestD) { bestD = d; best = n; }
+  }
+  return best;
+}
+
+function isNodeVisible(n) {
+  if (activeFilter === 'all') return true;
+  return n.group === activeFilter || n.group === 'all';
+}
+
+// ─── EDGE TYPE ───────────────────────────────────────────────────────────────
+function edgeColor(type) {
+  switch(type) {
+    case 'feeds': return 'rgba(126,184,212,0.55)';
+    case 'xref': return 'rgba(212,167,106,0.45)';
+    case 'hosts': return 'rgba(160,190,220,0.5)';
+    case 'aggregates': return 'rgba(155,207,168,0.45)';
+    default: return 'rgba(180,180,200,0.3)';
+  }
+}
+
+// ─── DRAW ─────────────────────────────────────────────────────────────────────
+function draw() {
+  const W = window.innerWidth, H = window.innerHeight;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#060911';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.012)';
+  ctx.lineWidth = 0.5;
+  const gridSize = 60 * zoom;
+  const ox = pan.x % gridSize, oy = pan.y % gridSize;
+  for (let x = ox; x < W; x += gridSize) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = oy; y < H; y += gridSize) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
+
+  // ── Draw edges ──
+  EDGES.forEach(e => {
+    const from = NODES.find(n => n.id === e.from);
+    const to = NODES.find(n => n.id === e.to);
+    if (!from || !to) return;
+
+    const fromVis = isNodeVisible(from), toVis = isNodeVisible(to);
+    if (!fromVis && !toVis) return;
+
+    const sf = worldToScreen(from.x, from.y);
+    const st = worldToScreen(to.x, to.y);
+
+    const isHighlighted = selectedNode && (selectedNode.id === from.id || selectedNode.id === to.id);
+    const isHovered = hoveredNode && (hoveredNode.id === from.id || hoveredNode.id === to.id);
+
+    const alpha = (fromVis && toVis) ? 1 : 0.2;
+    const baseColor = edgeColor(e.type);
+
+    ctx.save();
+    ctx.globalAlpha = isHighlighted ? 0.95 : isHovered ? 0.7 : alpha * 0.5;
+
+    if (e.type === 'xref') {
+      ctx.setLineDash([4, 6]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    ctx.strokeStyle = isHighlighted ? baseColor.replace('0.', '0.95,').replace('rgba(', 'rgba(') : baseColor;
+    ctx.lineWidth = isHighlighted ? e.weight + 1 : e.weight * 0.7;
+
+    // Curved lines
+    const mx = (sf.x + st.x) / 2 + (st.y - sf.y) * 0.08;
+    const my = (sf.y + st.y) / 2 - (st.x - sf.x) * 0.08;
+
+    ctx.beginPath();
+    ctx.moveTo(sf.x, sf.y);
+    ctx.quadraticCurveTo(mx, my, st.x, st.y);
+    ctx.stroke();
+
+    // Arrow
+    if (isHighlighted && (e.type === 'feeds' || e.type === 'hosts')) {
+      const t = 0.75;
+      const ax = (1-t)*(1-t)*sf.x + 2*(1-t)*t*mx + t*t*st.x;
+      const ay = (1-t)*(1-t)*sf.y + 2*(1-t)*t*my + t*t*st.y;
+      const dx2 = st.x - mx, dy2 = st.y - my;
+      const angle = Math.atan2(dy2, dx2);
+      ctx.setLineDash([]);
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.translate(ax, ay);
+      ctx.rotate(angle);
+      ctx.moveTo(0, 0); ctx.lineTo(-8, -4); ctx.lineTo(-8, 4);
+      ctx.closePath(); ctx.fill();
+    }
+
+    ctx.restore();
+  });
+
+  // ── Draw particles ──
+  particles.forEach(p => {
+    const { from, to, t, color, size } = p;
+    if (!isNodeVisible(from) || !isNodeVisible(to)) return;
+    const sf = worldToScreen(from.x, from.y);
+    const st = worldToScreen(to.x, to.y);
+    const mx = (sf.x + st.x) / 2 + (st.y - sf.y) * 0.08;
+    const my = (sf.y + st.y) / 2 - (st.x - sf.x) * 0.08;
+    const px = (1-t)*(1-t)*sf.x + 2*(1-t)*t*mx + t*t*st.x;
+    const py = (1-t)*(1-t)*sf.y + 2*(1-t)*t*my + t*t*st.y;
+    const alpha = t < 0.2 ? t/0.2 : t > 0.8 ? (1-t)/0.2 : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(px, py, size * zoom * 0.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // ── Draw nodes ──
+  NODES.forEach(n => {
+    const s = worldToScreen(n.x, n.y);
+    const visible = isNodeVisible(n);
+    const isHov = hoveredNode?.id === n.id;
+    const isSel = selectedNode?.id === n.id;
+    const isConnected = selectedNode && EDGES.some(e =>
+      (e.from === selectedNode.id && e.to === n.id) ||
+      (e.to === selectedNode.id && e.from === n.id)
+    );
+
+    const alpha = visible ? (selectedNode ? (isSel || isConnected ? 1 : 0.2) : 1) : 0.08;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const r = (n.size * zoom) * (isHov || isSel ? 1.2 : 1);
+
+    // Glow
+    if (isHov || isSel || n.type === 'hub') {
+      const glowR = r * 3;
+      const grd = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
+      const col = n.color;
+      grd.addColorStop(0, col + '33');
+      grd.addColorStop(1, col + '00');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, glowR, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Node body
+    if (n.type === 'hub') {
+      // Hexagon for hubs
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * 60 - 30) * Math.PI / 180;
+        const px = s.x + r * Math.cos(angle);
+        const py = s.y + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      const grad = ctx.createRadialGradient(s.x, s.y - r*0.3, 0, s.x, s.y, r);
+      grad.addColorStop(0, lightenColor(n.color, 0.3));
+      grad.addColorStop(1, n.color);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = lightenColor(n.color, 0.5);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else {
+      // Circle for databases
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI*2);
+      const grad = ctx.createRadialGradient(s.x, s.y - r*0.3, 0, s.x, s.y, r);
+      grad.addColorStop(0, lightenColor(n.color, 0.4));
+      grad.addColorStop(1, n.color);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      if (isSel || isHov) {
+        ctx.strokeStyle = lightenColor(n.color, 0.6);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    // Label
+    const labelSize = Math.max(9, Math.min(14, n.size * zoom * 0.55));
+    ctx.font = `${n.type === 'hub' ? '500' : '400'} ${labelSize}px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Label position
+    const labelOffset = r + labelSize * 0.8;
+    const labelY = s.y + labelOffset;
+
+    // Label background
+    const textW = ctx.measureText(n.label).width;
+    ctx.fillStyle = 'rgba(6,9,17,0.7)';
+    ctx.fillRect(s.x - textW/2 - 3, labelY - labelSize/2 - 2, textW + 6, labelSize + 4);
+
+    ctx.fillStyle = n.type === 'hub' ? lightenColor(n.color, 0.4) :
+                    isSel ? '#e8ecf4' : isHov ? lightenColor(n.color, 0.5) : '#8a9ab0';
+    ctx.fillText(n.label, s.x, labelY);
+
+    ctx.restore();
+  });
+
+  // Minimap
+  drawMinimap();
+  animFrame++;
+}
+
+function lightenColor(hex, amount) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgb(${Math.min(255, r + Math.round((255-r)*amount))}, ${Math.min(255, g + Math.round((255-g)*amount))}, ${Math.min(255, b + Math.round((255-b)*amount))})`;
+}
+
+function drawMinimap() {
+  const mc = miniCanvas;
+  const mx = mc.width, my = mc.height;
+  miniCtx.clearRect(0, 0, mx, my);
+  miniCtx.fillStyle = 'rgba(6,9,17,0.8)';
+  miniCtx.fillRect(0, 0, mx, my);
+
+  const scaleX = mx / W, scaleY = my / H;
+
+  // Edges
+  EDGES.forEach(e => {
+    const from = NODES.find(n => n.id === e.from);
+    const to = NODES.find(n => n.id === e.to);
+    if (!from || !to) return;
+    miniCtx.strokeStyle = edgeColor(e.type).replace(/[\d.]+\)$/, '0.3)');
+    miniCtx.lineWidth = 0.5;
+    miniCtx.beginPath();
+    miniCtx.moveTo(from.x * scaleX, from.y * scaleY);
+    miniCtx.lineTo(to.x * scaleX, to.y * scaleY);
+    miniCtx.stroke();
+  });
+
+  // Nodes
+  NODES.forEach(n => {
+    const r = Math.max(1.5, n.size * 0.25 * scaleX * 60);
+    miniCtx.fillStyle = n.color + 'cc';
+    miniCtx.beginPath();
+    miniCtx.arc(n.x * scaleX, n.y * scaleY, r, 0, Math.PI*2);
+    miniCtx.fill();
+  });
+
+  // Viewport rect
+  const vpX = -pan.x / zoom * scaleX;
+  const vpY = -pan.y / zoom * scaleY;
+  const vpW = window.innerWidth / zoom * scaleX;
+  const vpH = window.innerHeight / zoom * scaleY;
+  miniCtx.strokeStyle = 'rgba(126,184,212,0.6)';
+  miniCtx.lineWidth = 1;
+  miniCtx.strokeRect(vpX, vpY, vpW, vpH);
+
+  // Copy to display mini canvas
+  const displayMini = document.getElementById('mini-canvas');
+  const dCtx = displayMini.getContext('2d');
+  displayMini.width = 130; displayMini.height = 90;
+  dCtx.drawImage(mc, 0, 0, mx, my, 0, 0, 130, 90);
+}
+
+// ─── ANIMATION LOOP ──────────────────────────────────────────────────────────
+function loop() {
+  spawnParticles();
+  updateParticles();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─── EVENTS ──────────────────────────────────────────────────────────────────
+window.addEventListener('resize', resize);
+
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  lastMouse = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener('mousemove', e => {
+  if (dragging && lastMouse) {
+    pan.x += e.clientX - lastMouse.x;
+    pan.y += e.clientY - lastMouse.y;
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
+  hoveredNode = hitNode(e.clientX, e.clientY);
+  canvas.style.cursor = hoveredNode ? 'pointer' : (dragging ? 'grabbing' : 'grab');
+});
+
+window.addEventListener('mouseup', e => {
+  if (!dragging || (lastMouse && Math.abs(e.clientX - lastMouse.x) < 3 && Math.abs(e.clientY - lastMouse.y) < 3)) {
+    const hit = hitNode(e.clientX, e.clientY);
+    if (hit) {
+      selectedNode = selectedNode?.id === hit.id ? null : hit;
+      if (selectedNode) openPanel(selectedNode);
+      else closePanel();
+    }
+  }
+  dragging = false;
+  lastMouse = null;
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  const mx = e.clientX, my = e.clientY;
+  pan.x = mx - (mx - pan.x) * factor;
+  pan.y = my - (my - pan.y) * factor;
+  zoom *= factor;
+  zoom = Math.max(0.15, Math.min(3, zoom));
+}, { passive: false });
+
+// Touch
+let lastTouch = null, lastTouchDist = null;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.sqrt(dx*dx+dy*dy);
+  }
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && lastTouch) {
+    pan.x += e.touches[0].clientX - lastTouch.x;
+    pan.y += e.touches[0].clientY - lastTouch.y;
+    lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  if (e.touches.length === 2 && lastTouchDist) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    const factor = dist / lastTouchDist;
+    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    pan.x = cx - (cx - pan.x) * factor;
+    pan.y = cy - (cy - pan.y) * factor;
+    zoom = Math.max(0.15, Math.min(3, zoom * factor));
+    lastTouchDist = dist;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+// ─── PANEL ───────────────────────────────────────────────────────────────────
+function openPanel(node) {
+  const panel = document.getElementById('info-panel');
+  document.getElementById('panel-title').textContent = node.label;
+
+  const typeLabels = { hub: 'Discipline Hub', primary: 'Primary Database', specialist: 'Specialist Database' };
+  const typeEl = document.getElementById('panel-type');
+  typeEl.textContent = typeLabels[node.type] || node.type;
+  typeEl.style.color = node.color;
+
+  document.getElementById('panel-desc').textContent = node.desc;
+
+  // Connections
+  const conns = EDGES.filter(e => e.from === node.id || e.to === node.id);
+  const connNodes = [...new Set(conns.map(e => e.from === node.id ? e.to : e.from))];
+  const connEl = document.getElementById('panel-connections');
+  if (connNodes.length) {
+    connEl.innerHTML = `<div class="connections-label">Connected to (${connNodes.length})</div>` +
+      connNodes.map(id => {
+        const n = NODES.find(x => x.id === id);
+        const e = conns.find(e => e.from === id || e.to === id);
+        const dir = e.from === node.id ? '→' : '←';
+        return `<span class="conn-tag">${dir} ${n?.label || id}</span>`;
+      }).join('');
+  }
+
+  // Data flows
+  const flowsEl = document.getElementById('panel-flows');
+  if (node.flows && node.flows.length) {
+    flowsEl.innerHTML = '<div class="connections-label">Data Flows</div>' +
+      node.flows.map(f => `<div class="flow-item"><span class="flow-arrow">${f.substring(0,1)}</span><span>${f.substring(1).trim()}</span></div>`).join('');
+  } else {
+    flowsEl.innerHTML = '';
+  }
+
+  panel.classList.remove('hidden');
+}
+
+function closePanel() {
+  document.getElementById('info-panel').classList.add('hidden');
+  selectedNode = null;
+}
+window.closePanel = closePanel;
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+window.setFilter = setFilter;
+
+function resetView() {
+  zoom = 1;
+  initView();
+  selectedNode = null;
+  activeFilter = 'all';
+  closePanel();
+  document.querySelectorAll('.ctrl-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+}
+window.resetView = resetView;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+resize();
+loop();
+</script>
+</body>
+</html>
